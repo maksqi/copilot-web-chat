@@ -54,7 +54,7 @@ A real-time AI chat application powered by GitHub Copilot's API, built with Flas
 
 4. Set up environment variables:
    - Create a `.env` file in the root directory
-   - Add your GitHub Copilot API key:
+   - Add your GitHub Copilot API ghu_ key:
      ```
      COPILOT_TOKENS=token1,token2
      SECRET_KEY=random_string
