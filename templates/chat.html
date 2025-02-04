@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Open Graph / Facebook Meta Tags -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:title" content="Free AI Chat">
+    <meta property="og:description" content="Chat with AI in real-time. Experience interactive conversations and advanced features. Created by @maksqi">
+    <meta property="og:image" content="https://i.imgur.com/vAKAPus.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:site_name" content="Free Chat">
+
+    <!-- Twitter Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="{{ request.url }}">
+    <meta name="twitter:title" content="Free AI Chat">
+    <meta name="twitter:description" content="Chat with AI in real-time. Experience interactive conversations and advanced features. Created by @maksqi">
+    <meta name="twitter:image" content="https://i.imgur.com/vAKAPus.png">
+    <meta name="twitter:image:alt" content="Free Chat">
+    <meta name="twitter:image:width" content="1200">
+    <meta name="twitter:image:height" content="630">
+    <meta name="twitter:image:alt" content="Free Chat">
+
+    <title>Free Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="https://i.imgur.com/DYndlBg.png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Add highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Add marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Add copy to clipboard icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Chats <span id="chat-stats" class="stats-badge" title="Total number of user messages across all chats"><i class="fas fa-comments"></i> <span class="stats-number"></span></span></h2>
+            <button id="new-chat-btn">+ New Chat</button>
+            <ul id="chat-list">
+            {% for chat in chats %}
+                <li data-chat-id="{{ chat.id }}" class="chat-item {% if loop.first %}active{% endif %}">
+                    <span class="chat-item-name" onclick="selectChat(this.parentElement)">{{ chat.name }}</span>
+                    <span class="chat-controls">
+                        <span class="rename-chat" onclick="renameChat(event, '{{ chat.id }}')"><i class="fas fa-pencil-alt"></i></span>
+                        <span class="delete-chat" onclick="deleteChat(event, '{{ chat.id }}')"><i class="fas fa-trash-alt"></i></span>
+                    </span>
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+        <div class="chat-area">
+            <div id="chat-header">
+                <span id="chat-name">{{ chats[0].name if chats else 'No Chat'}}</span>
+            </div>
+            <div id="messages">
+                <!-- Chat messages will be loaded here -->
+            </div>
+            <form id="message-form">
+                <select id="model-select" name="model">
+                    {% for model in models %}
+                        <option value="{{ model.id }}" {% if model.id == request.args.get('model', 'gpt-4o') %}selected{% endif %}>
+                            {{ model.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <textarea id="message-input" name="message" placeholder="Type your message..."></textarea>
+                <button type="submit">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentChatId = "{{ chats[0].id if chats else '' }}";
+
+        // Configure marked.js
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true
+        });
+
+        // Helper function to format message content
+        function formatMessage(content) {
+            // Parse message content as Markdown
+            const html = marked.parse(content);
+
+            // Wrap code blocks with a container for the copy button
+            return html.replace(/<pre><code class="(.*?)">([\s\S]*?)<\/code><\/pre>/g,
+                '<div class="code-block"><pre><code class="$1">$2</code></pre>' +
+                '<button class="copy-code-btn" onclick="copyCode(this)">' +
+                '<i class="fas fa-copy"></i></button></div>'
+            );
+        }
+
+        // Function to copy code to clipboard
+        function copyCode(button) {
+            const codeBlock = button.parentElement.querySelector('code');
+            const code = codeBlock.innerText;
+
+            navigator.clipboard.writeText(code).then(() => {
+                // Change icon temporarily to show success
+                const icon = button.querySelector('i');
+                icon.classList.remove('fa-copy');
+                icon.classList.add('fa-check');
+
+                setTimeout(() => {
+                    icon.classList.remove('fa-check');
+                    icon.classList.add('fa-copy');
+                }, 2000);
+            });
+        }
+
+        // Function to load messages for the current chat.
+        function loadMessages(chatId) {
+            fetch(`/chat/${chatId}/messages`)
+                .then(response => response.json())
+                .then(data => {
+                    const messagesDiv = document.getElementById("messages");
+                    messagesDiv.innerHTML = "";
+                    data.forEach(msg => {
+                        const msgDiv = document.createElement("div");
+                        msgDiv.className = "message " + msg.role;
+                        msgDiv.innerHTML = formatMessage(msg.content);
+                        messagesDiv.appendChild(msgDiv);
+                        // Highlight any code blocks
+                        msgDiv.querySelectorAll('pre code').forEach((block) => {
+                            hljs.highlightBlock(block);
+                        });
+                    });
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                });
+        }
+
+        // Load messages for default chat on page load.
+        if (currentChatId) {
+            loadMessages(currentChatId);
+        }
+
+        // Handle chat item click.
+        document.querySelectorAll(".chat-item").forEach(item => {
+            item.addEventListener("click", function() {
+                document.querySelectorAll(".chat-item").forEach(i => i.classList.remove("active"));
+                this.classList.add("active");
+                currentChatId = this.getAttribute("data-chat-id");
+                document.getElementById("chat-name").textContent = this.querySelector('.chat-item-name').textContent;
+                loadMessages(currentChatId);
+            });
+        });
+
+        // Handle new chat creation.
+        document.getElementById("new-chat-btn").addEventListener("click", function() {
+            const formData = new FormData();
+            fetch("/chat/new", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.id) {
+                    const chatList = document.getElementById("chat-list");
+                    const li = document.createElement("li");
+                    li.setAttribute("data-chat-id", data.id);
+                    li.innerHTML = '<span class="chat-item-name">' + data.name + '</span>' +
+                        '<span class="chat-controls">' +
+                          '<span class="rename-chat" onclick="renameChat(event, \'' + data.id + '\')"><i class="fas fa-pencil-alt"></i></span>' +
+                          '<span class="delete-chat" onclick="deleteChat(event, \'' + data.id + '\')"><i class="fas fa-trash-alt"></i></span>' +
+                        '</span>';
+                    li.classList.add("chat-item");
+                    chatList.prepend(li);
+                    li.addEventListener("click", function() {
+                        document.querySelectorAll(".chat-item").forEach(i => i.classList.remove("active"));
+                        this.classList.add("active");
+                        currentChatId = this.getAttribute("data-chat-id");
+                        document.getElementById("chat-name").textContent = this.querySelector('.chat-item-name').textContent;
+                        loadMessages(currentChatId);
+                    });
+
+                    // New chat created; now redirect to it:
+                    document.querySelectorAll(".chat-item").forEach(i => i.classList.remove("active"));
+                    li.classList.add("active");
+                    currentChatId = data.id;
+                    document.getElementById("chat-name").textContent = data.name;
+                    loadMessages(currentChatId);
+                }
+            });
+        });
+
+        // Function to add a message to the chat
+        function addMessage(content, role) {
+            const messagesDiv = document.getElementById("messages");
+            const msgDiv = document.createElement("div");
+            msgDiv.className = "message " + role;
+            msgDiv.innerHTML = formatMessage(content);
+            messagesDiv.appendChild(msgDiv);
+            // Highlight any code blocks
+            msgDiv.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightBlock(block);
+            });
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Function to show typing animation
+        function showTypingAnimation() {
+            const messagesDiv = document.getElementById("messages");
+            const typingDiv = document.createElement("div");
+            typingDiv.className = "message assistant typing-animation";
+            typingDiv.innerHTML = '<div class="typing"><div></div><div></div><div></div></div>';
+            messagesDiv.appendChild(typingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            return typingDiv;
+        }
+
+        // Handle sending a new message.
+        document.getElementById("message-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const messageInput = document.getElementById("message-input");
+            const messageForm = document.getElementById("message-form");
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // Add sending animation class
+            messageForm.classList.add('sending');
+
+            // Immediately show the user's message
+            addMessage(message, 'user');
+
+            const formData = new FormData();
+            formData.append("message", message);
+            formData.append("chat_id", currentChatId);
+
+            // Clear input with animation
+            messageInput.value = "";
+
+            // Show typing animation
+            const typingAnimation = showTypingAnimation();
+
+            fetch("/send", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.reply) {
+                    // Remove typing animation
+                    typingAnimation.remove();
+                    // Add AI response
+                    addMessage(data.reply, 'assistant');
+                    // If a new title was generated, update the chat header and the sidebar.
+                    if(data.title) {
+                        document.getElementById("chat-name").textContent = data.title;
+                        const chatItem = document.querySelector(`.chat-item[data-chat-id="${currentChatId}"]`);
+                        if(chatItem) {
+                            chatItem.querySelector('.chat-item-name').textContent = data.title;
+                        }
+                    }
+                } else {
+                    typingAnimation.remove();
+                    alert(data.error);
+                }
+            })
+            .finally(() => {
+                // Remove sending animation class
+                messageForm.classList.remove('sending');
+            });
+        });
+
+        // Handle model selection change.
+        document.getElementById("model-select").addEventListener("change", function() {
+            const selectedModel = this.value;
+            const formData = new FormData();
+            formData.append("model", selectedModel);
+
+            // Update URL with the new model parameter
+            const url = new URL(window.location);
+            url.searchParams.set('model', selectedModel);
+            window.history.pushState({}, '', url);
+
+            fetch(`/chat/${currentChatId}/update_model`, {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert("Failed to update model: " + data.error);
+                }
+            });
+        });
+
+        // Function to delete a chat
+        function deleteChat(event, chatId) {
+            event.stopPropagation(); // Prevent triggering the chat item click
+            if (!confirm("Are you sure you want to delete this chat?")) {
+                return;
+            }
+            fetch(`/chat/${chatId}/delete`, {
+                method: "POST"
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove the chat item from the sidebar
+                    const chatItem = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+                    if (chatItem) {
+                        chatItem.remove();
+                    }
+                    // If deleted chat was active, switch to the first available chat.
+                    if (currentChatId === chatId) {
+                        const firstChat = document.querySelector(".chat-item");
+                        if (firstChat) {
+                            firstChat.classList.add("active");
+                            currentChatId = firstChat.getAttribute("data-chat-id");
+                            document.getElementById("chat-name").textContent = firstChat.querySelector('.chat-item-name').textContent;
+                            loadMessages(currentChatId);
+                        } else {
+                            // If no chats remain, reload the page to create a new default chat.
+                            location.reload();
+                        }
+                    }
+                } else {
+                    alert("Unable to delete chat: " + data.error);
+                }
+            });
+        }
+
+        // New function: select chat item (called when clicking on the chat-name text)
+        function selectChat(chatItem) {
+            document.querySelectorAll(".chat-item").forEach(i => i.classList.remove("active"));
+            chatItem.classList.add("active");
+            currentChatId = chatItem.getAttribute("data-chat-id");
+            document.getElementById("chat-name").textContent = chatItem.querySelector('.chat-item-name').textContent;
+            loadMessages(currentChatId);
+        }
+
+        // Function to rename a chat (triggered by the pencil icon in the sidebar)
+        function renameChat(event, chatId) {
+            event.stopPropagation(); // Prevent selecting the chat.
+            let newName = prompt("Enter new name for this chat:");
+            if (newName && newName.trim() !== "") {
+                const formData = new FormData();
+                formData.append("name", newName.trim());
+                fetch(`/chat/${chatId}/rename`, {
+                    method: "POST",
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update chat name in the sidebar
+                        const chatItem = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+                        if (chatItem) {
+                            chatItem.querySelector('.chat-item-name').textContent = newName;
+                        }
+                        // If the renamed chat is active, update the header.
+                        if (chatId === currentChatId) {
+                            document.getElementById("chat-name").textContent = newName;
+                        }
+                    } else {
+                        alert("Rename failed: " + data.error);
+                    }
+                });
+            }
+        }
+
+        // Add event listener for textarea keydown
+        document.getElementById("message-input").addEventListener("keydown", function(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                document.getElementById("message-form").dispatchEvent(new Event('submit'));
+            }
+        });
+
+        // Обновлённая функция для обновления статистики сообщений пользователей
+        function updateChatStats() {
+            fetch('/stats/messages')
+                .then(response => response.json())
+                .then(data => {
+                    document.querySelector('#chat-stats .stats-number').textContent = data.total;
+                })
+                .catch(error => console.error("Error fetching chat statistics:", error));
+        }
+
+        // Запускаем обновление статистики каждые 10 секунд, а также делаем первичный вызов
+        setInterval(updateChatStats, 10000);
+        updateChatStats();
+    </script>
+</body>
+</html>
