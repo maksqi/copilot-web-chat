@@ -54,12 +54,14 @@ COPILOT_CHAT_AUTH_URL = "https://api.github.com/copilot_internal/v2/token"
 
 # Available models for Copilot
 AVAILABLE_MODELS = [
+    {"id": "claude-3.7-sonnet", "name": "Claude 3.7 Sonnet"},
+    {"id": "claude-3.5-sonnet", "name": "Claude 3.5 Sonnet"},
     {"id": "gpt-4o-2024-05-13", "name": "GPT-4o"},
     {"id": "gpt-4", "name": "GPT-4"},
     # {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo"},
     {"id": "o1", "name": "o1"},
     {"id": "o3-mini", "name": "o3-mini"},
-    {"id": "claude-3.5-sonnet", "name": "Claude 3.5 Sonnet"}
+    {"id": "gemini-2.0-flash-001", "name": "Gemini 2.0 Flash 001"},
 ]
 
 
@@ -73,7 +75,9 @@ def get_copilot_token():
 def get_api_token(oauth_token):
     headers = {
         "Authorization": f"token {oauth_token}",
-        "Accept": "application/json"
+        "Accept": "application/json",
+        "Editor-Version": "Zed/unknown",
+        "Copilot-Integration-Id": "vscode-chat"
     }
     try:
         response = requests.get(COPILOT_CHAT_AUTH_URL, headers=headers)
@@ -392,4 +396,4 @@ def robots_txt():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=6767)

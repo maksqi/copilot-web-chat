@@ -91,12 +91,13 @@ A real-time AI chat application powered by GitHub Copilot's API, built with Flas
 - Message history persistence
 
 ### AI Models
-- Support for multiple AI models:
-  - GPT-4
+  - Claude 3.7 Sonnet (best model)
   - Claude 3.5 Sonnet
+  - GPT-4
   - GPT-4o
   - o1
   - o3-mini
+  - Gemini 2.0 Flash
 
 ### User Interface
 - Clean, modern dark theme
