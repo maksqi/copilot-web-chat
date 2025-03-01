@@ -4,7 +4,7 @@ A real-time AI chat application powered by GitHub Copilot's API, built with Flas
 
 🌐 **Try it live at: [space123.space](https://space123.space/)**
 
-![Chat Interface](https://i.imgur.com/EwWdvMv.png)
+![Chat Interface](https://i.imgur.com/ah8qcbw.png)
 
 ## Features
 

@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <!-- Open Graph / Facebook Meta Tags -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.url }}">
     <meta property="og:title" content="Free AI Chat">
@@ -23,376 +22,694 @@
     <meta name="twitter:image:width" content="1200">
     <meta name="twitter:image:height" content="630">
     <meta name="twitter:image:alt" content="Free Chat">
-
-    <title>Free Chat</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="googlebot" content="index, follow">
-    <link rel="icon" type="image/png" href="https://i.imgur.com/DYndlBg.png">
+    <title>Free Ai Chat</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <!-- Add highlight.js for code syntax highlighting -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <!-- Add marked.js for Markdown parsing -->
+    <link rel="icon" type="image/png" href="https://i.imgur.com/DYndlBg.png">
+    <!-- Highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Markdown parser -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- Add copy to clipboard icon -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <div class="sidebar">
-            <h2>Chats <span id="chat-stats" class="stats-badge" title="Total number of user messages across all chats"><i class="fas fa-comments"></i> <span class="stats-number"></span></span></h2>
-            <button id="new-chat-btn">+ New Chat</button>
-            <ul id="chat-list">
-            {% for chat in chats %}
-                <li data-chat-id="{{ chat.id }}" class="chat-item {% if loop.first %}active{% endif %}">
-                    <span class="chat-item-name" onclick="selectChat(this.parentElement)">{{ chat.name }}</span>
-                    <span class="chat-controls">
-                        <span class="rename-chat" onclick="renameChat(event, '{{ chat.id }}')"><i class="fas fa-pencil-alt"></i></span>
-                        <span class="delete-chat" onclick="deleteChat(event, '{{ chat.id }}')"><i class="fas fa-trash-alt"></i></span>
-                    </span>
-                </li>
-            {% endfor %}
-            </ul>
-        </div>
-        <div class="chat-area">
-            <div id="chat-header">
-                <span id="chat-name">{{ chats[0].name if chats else 'No Chat'}}</span>
+    <div class="app-container">
+        <!-- Sidebar with chat history -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <button id="new-chat-btn" class="new-chat-btn">
+                    <i class="fas fa-plus"></i> New Chat
+                </button>
             </div>
-            <div id="messages">
-                <!-- Chat messages will be loaded here -->
-            </div>
-            <form id="message-form">
-                <select id="model-select" name="model">
+
+            <div class="model-selector">
+                <select id="model-select">
                     {% for model in models %}
-                        <option value="{{ model.id }}" {% if model.id == request.args.get('model', 'gpt-4o') %}selected{% endif %}>
-                            {{ model.name }}
-                        </option>
+                    <option value="{{ model.id }}" {% if chats and chats[0].model == model.id %}selected{% endif %}>
+                        {{ model.name }}
+                    </option>
                     {% endfor %}
                 </select>
-                <textarea id="message-input" name="message" placeholder="Type your message..."></textarea>
-                <button type="submit">Send</button>
-            </form>
+            </div>
+
+            <div class="chat-list">
+                {% for chat in chats %}
+                <div class="chat-item {% if request.args.get('chat_id') == chat.id %}active{% endif %}"
+                     data-id="{{ chat.id }}"
+                     data-name="{{ chat.name }}">
+                    <div class="chat-item-content">
+                        <i class="fas fa-comment-alt"></i>
+                        <span class="chat-name">{{ chat.name }}</span>
+                    </div>
+                    <div class="chat-actions">
+                        <button class="rename-chat" title="Rename chat">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="delete-chat" title="Delete chat">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Add stats counter at the bottom of sidebar -->
+            <div class="stats-container">
+                <div class="stats-item">
+                    <div class="stats-count">
+                        <span id="messages-count">0</span>
+                        <span class="stats-label">total chats</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main chat area -->
+        <main class="chat-container">
+            <!-- Мобильная кнопка меню -->
+            <button id="mobile-menu-toggle" class="mobile-only">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <div class="chat-header">
+                <div id="current-chat-name">
+                    {% if chats %}
+                        {% if request.args.get('chat_id') %}
+                            {% for chat in chats %}
+                                {% if chat.id == request.args.get('chat_id') %}
+                                    {{ chat.name }}
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            {{ chats[0].name }}
+                        {% endif %}
+                    {% else %}
+                        New Chat
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+                <!-- Messages will be inserted here dynamically -->
+            </div>
+
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <textarea id="message-input" placeholder="Type a message..."></textarea>
+                    <button id="send-button">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Rename chat modal -->
+    <div class="modal" id="rename-modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Rename Chat</h2>
+            <input type="text" id="new-chat-name" placeholder="Enter new name">
+            <button id="save-chat-name">Save</button>
         </div>
     </div>
 
+    <!-- Delete chat confirmation modal -->
+    <div class="modal" id="delete-modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Delete Chat</h2>
+            <p>Are you sure you want to delete this chat?</p>
+            <div class="modal-actions">
+                <button id="cancel-delete">Cancel</button>
+                <button id="confirm-delete">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="menu-overlay"></div>
+
     <script>
-        let currentChatId = "{{ chats[0].id if chats else '' }}";
+        // Store current chat ID
+        let currentChatId = '{{ request.args.get("chat_id") or (chats[0].id if chats else "") }}';
 
-        // Configure marked.js
-        marked.setOptions({
-            highlight: function(code, lang) {
-                if (lang && hljs.getLanguage(lang)) {
-                    return hljs.highlight(code, { language: lang }).value;
-                }
-                return hljs.highlightAuto(code).value;
-            },
-            breaks: true
-        });
-
-        // Helper function to format message content
-        function formatMessage(content) {
-            // Parse message content as Markdown
-            const html = marked.parse(content);
-
-            // Wrap code blocks with a container for the copy button
-            return html.replace(/<pre><code class="(.*?)">([\s\S]*?)<\/code><\/pre>/g,
-                '<div class="code-block"><pre><code class="$1">$2</code></pre>' +
-                '<button class="copy-code-btn" onclick="copyCode(this)">' +
-                '<i class="fas fa-copy"></i></button></div>'
-            );
-        }
-
-        // Function to copy code to clipboard
-        function copyCode(button) {
-            const codeBlock = button.parentElement.querySelector('code');
-            const code = codeBlock.innerText;
-
-            navigator.clipboard.writeText(code).then(() => {
-                // Change icon temporarily to show success
-                const icon = button.querySelector('i');
-                icon.classList.remove('fa-copy');
-                icon.classList.add('fa-check');
-
-                setTimeout(() => {
-                    icon.classList.remove('fa-check');
-                    icon.classList.add('fa-copy');
-                }, 2000);
-            });
-        }
-
-        // Function to load messages for the current chat.
-        function loadMessages(chatId) {
-            fetch(`/chat/${chatId}/messages`)
-                .then(response => response.json())
-                .then(data => {
-                    const messagesDiv = document.getElementById("messages");
-                    messagesDiv.innerHTML = "";
-                    data.forEach(msg => {
-                        const msgDiv = document.createElement("div");
-                        msgDiv.className = "message " + msg.role;
-                        msgDiv.innerHTML = formatMessage(msg.content);
-                        messagesDiv.appendChild(msgDiv);
-                        // Highlight any code blocks
-                        msgDiv.querySelectorAll('pre code').forEach((block) => {
-                            hljs.highlightBlock(block);
-                        });
-                    });
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                });
-        }
-
-        // Load messages for default chat on page load.
+        // Load initial messages if a chat is selected
         if (currentChatId) {
             loadMessages(currentChatId);
         }
 
-        // Handle chat item click.
-        document.querySelectorAll(".chat-item").forEach(item => {
-            item.addEventListener("click", function() {
-                document.querySelectorAll(".chat-item").forEach(i => i.classList.remove("active"));
-                this.classList.add("active");
-                currentChatId = this.getAttribute("data-chat-id");
-                document.getElementById("chat-name").textContent = this.querySelector('.chat-item-name').textContent;
-                loadMessages(currentChatId);
-            });
-        });
+        // Handle selecting a chat from the sidebar
+        document.querySelectorAll('.chat-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                if (!e.target.closest('.chat-actions')) {
+                    const chatId = this.dataset.id;
+                    const chatName = this.dataset.name;
 
-        // Handle new chat creation.
-        document.getElementById("new-chat-btn").addEventListener("click", function() {
-            const formData = new FormData();
-            fetch("/chat/new", {
-                method: "POST",
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.id) {
-                    const chatList = document.getElementById("chat-list");
-                    const li = document.createElement("li");
-                    li.setAttribute("data-chat-id", data.id);
-                    li.innerHTML = '<span class="chat-item-name">' + data.name + '</span>' +
-                        '<span class="chat-controls">' +
-                          '<span class="rename-chat" onclick="renameChat(event, \'' + data.id + '\')"><i class="fas fa-pencil-alt"></i></span>' +
-                          '<span class="delete-chat" onclick="deleteChat(event, \'' + data.id + '\')"><i class="fas fa-trash-alt"></i></span>' +
-                        '</span>';
-                    li.classList.add("chat-item");
-                    chatList.prepend(li);
-                    li.addEventListener("click", function() {
-                        document.querySelectorAll(".chat-item").forEach(i => i.classList.remove("active"));
-                        this.classList.add("active");
-                        currentChatId = this.getAttribute("data-chat-id");
-                        document.getElementById("chat-name").textContent = this.querySelector('.chat-item-name').textContent;
-                        loadMessages(currentChatId);
-                    });
+                    // Update UI to show this is the active chat
+                    document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
 
-                    // New chat created; now redirect to it:
-                    document.querySelectorAll(".chat-item").forEach(i => i.classList.remove("active"));
-                    li.classList.add("active");
-                    currentChatId = data.id;
-                    document.getElementById("chat-name").textContent = data.name;
-                    loadMessages(currentChatId);
+                    // Update current chat name in header
+                    document.getElementById('current-chat-name').textContent = chatName;
+
+                    // Update URL without page reload
+                    history.pushState({}, '', `/?chat_id=${chatId}`);
+
+                    // Set current chat ID and load messages
+                    currentChatId = chatId;
+                    loadMessages(chatId);
                 }
             });
         });
 
-        // Function to add a message to the chat
-        function addMessage(content, role) {
-            const messagesDiv = document.getElementById("messages");
-            const msgDiv = document.createElement("div");
-            msgDiv.className = "message " + role;
-            msgDiv.innerHTML = formatMessage(content);
-            messagesDiv.appendChild(msgDiv);
-            // Highlight any code blocks
-            msgDiv.querySelectorAll('pre code').forEach((block) => {
-                hljs.highlightBlock(block);
-            });
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        }
+        // Create new chat
+        document.getElementById('new-chat-btn').addEventListener('click', function() {
+            const modelSelect = document.getElementById('model-select');
+            const selectedModel = modelSelect.value;
 
-        // Function to show typing animation
-        function showTypingAnimation() {
-            const messagesDiv = document.getElementById("messages");
-            const typingDiv = document.createElement("div");
-            typingDiv.className = "message assistant typing-animation";
-            typingDiv.innerHTML = '<div class="typing"><div></div><div></div><div></div></div>';
-            messagesDiv.appendChild(typingDiv);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            return typingDiv;
-        }
-
-        // Handle sending a new message.
-        document.getElementById("message-form").addEventListener("submit", function(event) {
-            event.preventDefault();
-            const messageInput = document.getElementById("message-input");
-            const messageForm = document.getElementById("message-form");
-            const message = messageInput.value.trim();
-            if (!message) return;
-
-            // Add sending animation class
-            messageForm.classList.add('sending');
-
-            // Immediately show the user's message
-            addMessage(message, 'user');
-
-            const formData = new FormData();
-            formData.append("message", message);
-            formData.append("chat_id", currentChatId);
-
-            // Clear input with animation
-            messageInput.value = "";
-
-            // Show typing animation
-            const typingAnimation = showTypingAnimation();
-
-            fetch("/send", {
-                method: "POST",
-                body: formData
+            fetch('/chat/new', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `model=${selectedModel}`
             })
             .then(response => response.json())
-            .then(data => {
-                if (data.reply) {
-                    // Remove typing animation
-                    typingAnimation.remove();
-                    // Add AI response
-                    addMessage(data.reply, 'assistant');
-                    // If a new title was generated, update the chat header and the sidebar.
-                    if(data.title) {
-                        document.getElementById("chat-name").textContent = data.title;
-                        const chatItem = document.querySelector(`.chat-item[data-chat-id="${currentChatId}"]`);
-                        if(chatItem) {
-                            chatItem.querySelector('.chat-item-name').textContent = data.title;
-                        }
-                    }
+            .then(chat => {
+                // Create new chat item in sidebar
+                const chatList = document.querySelector('.chat-list');
+                const chatItem = document.createElement('div');
+                chatItem.className = 'chat-item active';
+                chatItem.dataset.id = chat.id;
+                chatItem.dataset.name = chat.name;
+
+                chatItem.innerHTML = `
+                    <div class="chat-item-content">
+                        <i class="fas fa-comment-alt"></i>
+                        <span class="chat-name">${chat.name}</span>
+                    </div>
+                    <div class="chat-actions">
+                        <button class="rename-chat" title="Rename chat">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="delete-chat" title="Delete chat">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+
+                // Remove active class from all chats
+                document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
+
+                // Add new chat to the top of the list
+                if (chatList.firstChild) {
+                    chatList.insertBefore(chatItem, chatList.firstChild);
                 } else {
-                    typingAnimation.remove();
-                    alert(data.error);
+                    chatList.appendChild(chatItem);
                 }
+
+                // Update current chat ID and name
+                currentChatId = chat.id;
+                document.getElementById('current-chat-name').textContent = chat.name;
+
+                // Update URL
+                history.pushState({}, '', `/?chat_id=${chat.id}`);
+
+                // Clear messages area
+                document.getElementById('chat-messages').innerHTML = '';
+
+                // Add event listeners to new chat item
+                addChatItemEventListeners(chatItem);
             })
-            .finally(() => {
-                // Remove sending animation class
-                messageForm.classList.remove('sending');
-            });
+            .catch(error => console.error('Error creating new chat:', error));
         });
 
-        // Handle model selection change.
-        document.getElementById("model-select").addEventListener("change", function() {
-            const selectedModel = this.value;
-            const formData = new FormData();
-            formData.append("model", selectedModel);
+        // Function to add event listeners to chat items
+        function addChatItemEventListeners(chatItem) {
+            // Click to select chat
+            chatItem.addEventListener('click', function(e) {
+                if (!e.target.closest('.chat-actions')) {
+                    const chatId = this.dataset.id;
+                    const chatName = this.dataset.name;
 
-            // Update URL with the new model parameter
-            const url = new URL(window.location);
-            url.searchParams.set('model', selectedModel);
-            window.history.pushState({}, '', url);
+                    document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
 
-            fetch(`/chat/${currentChatId}/update_model`, {
-                method: "POST",
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success) {
-                    alert("Failed to update model: " + data.error);
+                    document.getElementById('current-chat-name').textContent = chatName;
+                    history.pushState({}, '', `/?chat_id=${chatId}`);
+
+                    currentChatId = chatId;
+                    loadMessages(chatId);
                 }
             });
-        });
 
-        // Function to delete a chat
-        function deleteChat(event, chatId) {
-            event.stopPropagation(); // Prevent triggering the chat item click
-            if (!confirm("Are you sure you want to delete this chat?")) {
-                return;
-            }
-            fetch(`/chat/${chatId}/delete`, {
-                method: "POST"
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Remove the chat item from the sidebar
-                    const chatItem = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
-                    if (chatItem) {
-                        chatItem.remove();
-                    }
-                    // If deleted chat was active, switch to the first available chat.
-                    if (currentChatId === chatId) {
-                        const firstChat = document.querySelector(".chat-item");
-                        if (firstChat) {
-                            firstChat.classList.add("active");
-                            currentChatId = firstChat.getAttribute("data-chat-id");
-                            document.getElementById("chat-name").textContent = firstChat.querySelector('.chat-item-name').textContent;
-                            loadMessages(currentChatId);
-                        } else {
-                            // If no chats remain, reload the page to create a new default chat.
-                            location.reload();
-                        }
-                    }
-                } else {
-                    alert("Unable to delete chat: " + data.error);
-                }
+            // Rename chat button
+            chatItem.querySelector('.rename-chat').addEventListener('click', function(e) {
+                e.stopPropagation();
+                const modal = document.getElementById('rename-modal');
+                const input = document.getElementById('new-chat-name');
+                const chatId = chatItem.dataset.id;
+
+                input.value = chatItem.dataset.name;
+                modal.style.display = 'flex';
+                input.focus();
+
+                // Store the chat ID to be renamed
+                document.getElementById('save-chat-name').dataset.chatId = chatId;
+            });
+
+            // Delete chat button
+            chatItem.querySelector('.delete-chat').addEventListener('click', function(e) {
+                e.stopPropagation();
+                const modal = document.getElementById('delete-modal');
+                const chatId = chatItem.dataset.id;
+
+                modal.style.display = 'flex';
+
+                // Store the chat ID to be deleted
+                document.getElementById('confirm-delete').dataset.chatId = chatId;
             });
         }
 
-        // New function: select chat item (called when clicking on the chat-name text)
-        function selectChat(chatItem) {
-            document.querySelectorAll(".chat-item").forEach(i => i.classList.remove("active"));
-            chatItem.classList.add("active");
-            currentChatId = chatItem.getAttribute("data-chat-id");
-            document.getElementById("chat-name").textContent = chatItem.querySelector('.chat-item-name').textContent;
-            loadMessages(currentChatId);
-        }
+        // Add event listeners to existing chat items
+        document.querySelectorAll('.chat-item').forEach(item => {
+            addChatItemEventListeners(item);
+        });
 
-        // Function to rename a chat (triggered by the pencil icon in the sidebar)
-        function renameChat(event, chatId) {
-            event.stopPropagation(); // Prevent selecting the chat.
-            let newName = prompt("Enter new name for this chat:");
-            if (newName && newName.trim() !== "") {
-                const formData = new FormData();
-                formData.append("name", newName.trim());
+        // Save renamed chat
+        document.getElementById('save-chat-name').addEventListener('click', function() {
+            const newName = document.getElementById('new-chat-name').value.trim();
+            const chatId = this.dataset.chatId;
+
+            if (newName) {
                 fetch(`/chat/${chatId}/rename`, {
-                    method: "POST",
-                    body: formData
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `name=${encodeURIComponent(newName)}`
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Update chat name in the sidebar
-                        const chatItem = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
-                        if (chatItem) {
-                            chatItem.querySelector('.chat-item-name').textContent = newName;
-                        }
-                        // If the renamed chat is active, update the header.
+                        // Update chat name in sidebar
+                        const chatItem = document.querySelector(`.chat-item[data-id="${chatId}"]`);
+                        chatItem.dataset.name = newName;
+                        chatItem.querySelector('.chat-name').textContent = newName;
+
+                        // Update chat name in header if this is the current chat
                         if (chatId === currentChatId) {
-                            document.getElementById("chat-name").textContent = newName;
+                            document.getElementById('current-chat-name').textContent = newName;
                         }
-                    } else {
-                        alert("Rename failed: " + data.error);
+
+                        // Close modal
+                        document.getElementById('rename-modal').style.display = 'none';
                     }
+                })
+                .catch(error => console.error('Error renaming chat:', error));
+            }
+        });
+
+        // Confirm delete chat
+        document.getElementById('confirm-delete').addEventListener('click', function() {
+            const chatId = this.dataset.chatId;
+
+            fetch(`/chat/${chatId}/delete`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove chat from sidebar
+                    const chatItem = document.querySelector(`.chat-item[data-id="${chatId}"]`);
+                    chatItem.remove();
+
+                    // Close modal
+                    document.getElementById('delete-modal').style.display = 'none';
+
+                    // If the deleted chat was the current chat, select the first available chat
+                    if (chatId === currentChatId) {
+                        const firstChat = document.querySelector('.chat-item');
+                        if (firstChat) {
+                            firstChat.click();
+                        } else {
+                            // No chats left, create a new one
+                            document.getElementById('new-chat-btn').click();
+                        }
+                    }
+                }
+            })
+            .catch(error => console.error('Error deleting chat:', error));
+        });
+
+        // Cancel delete
+        document.getElementById('cancel-delete').addEventListener('click', function() {
+            document.getElementById('delete-modal').style.display = 'none';
+        });
+
+        // Close modals when clicking the X
+        document.querySelectorAll('.close-modal').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.closest('.modal').style.display = 'none';
+            });
+        });
+
+        // Close modals when clicking outside
+        window.addEventListener('click', function(e) {
+            document.querySelectorAll('.modal').forEach(modal => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+
+        // Handle model selection change
+        document.getElementById('model-select').addEventListener('change', function() {
+            if (currentChatId) {
+                fetch(`/chat/${currentChatId}/update_model`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `model=${this.value}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('Model updated successfully');
+                    }
+                })
+                .catch(error => console.error('Error updating model:', error));
+            }
+        });
+
+        // Load messages for a chat
+        function loadMessages(chatId) {
+            fetch(`/chat/${chatId}/messages`)
+            .then(response => response.json())
+            .then(messages => {
+                const messagesContainer = document.getElementById('chat-messages');
+                messagesContainer.innerHTML = '';
+
+                messages.forEach(message => {
+                    appendMessage(message.role, message.content);
+                });
+
+                // Scroll to bottom
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            })
+            .catch(error => console.error('Error loading messages:', error));
+        }
+
+        // Send message
+        document.getElementById('send-button').addEventListener('click', sendMessage);
+        document.getElementById('message-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Auto-resize textarea based on content
+        const messageInput = document.getElementById('message-input');
+
+        messageInput.addEventListener('input', function() {
+            // Reset height to auto to get proper scrollHeight
+            this.style.height = 'auto';
+
+            // Set new height based on content, with max of 150px
+            const newHeight = Math.min(this.scrollHeight, 150);
+            this.style.height = newHeight + 'px';
+        });
+
+        // Initialize height on page load
+        messageInput.style.height = 'auto';
+        messageInput.style.height = (Math.min(messageInput.scrollHeight, 150)) + 'px';
+
+        // Reset height when message is sent
+        function resetTextareaHeight() {
+            messageInput.style.height = 'auto';
+            messageInput.style.height = '24px'; // Reset to initial height
+        }
+
+        // Update the sendMessage function to reset textarea height
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+
+            if (message && currentChatId) {
+                // Clear input and reset height
+                input.value = '';
+                resetTextareaHeight();
+
+                // Add user message to chat
+                appendMessage('user', message);
+
+                // Show loading indicator
+                const loadingMessage = document.createElement('div');
+                loadingMessage.className = 'message-wrapper assistant';
+                loadingMessage.innerHTML = `
+                    <div class="message">
+                        <div class="message-content loading">
+                            <div class="typing-indicator">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('chat-messages').appendChild(loadingMessage);
+                scrollToBottom();
+
+                // Send message to server
+                fetch('/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `message=${encodeURIComponent(message)}&chat_id=${currentChatId}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Remove loading indicator
+                    loadingMessage.remove();
+
+                    if (data.error) {
+                        console.error('Error:', data.error);
+                        appendMessage('assistant', `Error: ${data.error}`);
+                    } else {
+                        appendMessage('assistant', data.reply);
+
+                        // If chat was renamed, update the UI
+                        if (data.title) {
+                            const chatItem = document.querySelector(`.chat-item[data-id="${currentChatId}"]`);
+                            chatItem.dataset.name = data.title;
+                            chatItem.querySelector('.chat-name').textContent = data.title;
+                            document.getElementById('current-chat-name').textContent = data.title;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error sending message:', error);
+                    loadingMessage.remove();
+                    appendMessage('assistant', 'Error sending message. Please try again.');
                 });
             }
         }
 
-        // Add event listener for textarea keydown
-        document.getElementById("message-input").addEventListener("keydown", function(event) {
-            if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                document.getElementById("message-form").dispatchEvent(new Event('submit'));
-            }
-        });
+        // Append a message to the chat
+        function appendMessage(role, content) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message-wrapper ${role}`;
 
-        // Обновлённая функция для обновления статистики сообщений пользователей
-        function updateChatStats() {
+            // Process content for markdown and code blocks
+            const processedContent = processMessageContent(content);
+
+            messageDiv.innerHTML = `
+                <div class="message">
+                    <div class="message-content">
+                        ${processedContent}
+                    </div>
+                </div>
+            `;
+
+            messagesContainer.appendChild(messageDiv);
+
+            // Apply syntax highlighting to code blocks
+            messageDiv.querySelectorAll('pre code').forEach(block => {
+                hljs.highlightElement(block);
+            });
+
+            // Add copy buttons to code blocks
+            messageDiv.querySelectorAll('pre').forEach(pre => {
+                const copyButton = document.createElement('button');
+                copyButton.className = 'copy-code-btn';
+                copyButton.innerHTML = '<i class="fas fa-copy"></i>';
+                copyButton.title = 'Copy code';
+
+                copyButton.addEventListener('click', function() {
+                    const code = pre.querySelector('code').textContent;
+                    navigator.clipboard.writeText(code).then(() => {
+                        // Change button text temporarily
+                        this.innerHTML = '<i class="fas fa-check"></i>';
+                        setTimeout(() => {
+                            this.innerHTML = '<i class="fas fa-copy"></i>';
+                        }, 2000);
+                    });
+                });
+
+                pre.appendChild(copyButton);
+            });
+
+            scrollToBottom();
+        }
+
+        // Process message content to handle markdown and code blocks
+        function processMessageContent(content) {
+            // Configure marked.js to handle code blocks with language
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    if (lang && hljs.getLanguage(lang)) {
+                        return hljs.highlight(code, { language: lang }).value;
+                    }
+                    return hljs.highlightAuto(code).value;
+                },
+                langPrefix: 'language-'
+            });
+
+            // Convert markdown to HTML
+            return marked.parse(content);
+        }
+
+        // Scroll chat to bottom
+        function scrollToBottom() {
+            const messagesContainer = document.getElementById('chat-messages');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Load message stats when page loads
+        document.addEventListener('DOMContentLoaded', function() {
             fetch('/stats/messages')
                 .then(response => response.json())
                 .then(data => {
-                    document.querySelector('#chat-stats .stats-number').textContent = data.total;
+                    animateCounter('messages-count', data.total);
                 })
-                .catch(error => console.error("Error fetching chat statistics:", error));
+                .catch(error => console.error('Error fetching stats:', error));
+
+            // Установка Claude 3.7 Sonnet по умолчанию
+            const modelSelect = document.getElementById('model-select');
+            const defaultModel = 'claude-3.7-sonnet';
+
+            // Если модель отличается от claude-3.7-sonnet, меняем её
+            if (modelSelect && modelSelect.value !== defaultModel) {
+                // Находим опцию с нужной моделью
+                for (const option of modelSelect.options) {
+                    if (option.value === defaultModel) {
+                        option.selected = true;
+                        break;
+                    }
+                }
+
+                // Если есть текущий чат, обновляем модель на сервере
+                if (currentChatId) {
+                    fetch(`/chat/${currentChatId}/update_model`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `model=${defaultModel}`
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('Model updated to Claude 3.7 Sonnet');
+                        }
+                    })
+                    .catch(error => console.error('Error updating model:', error));
+                }
+            }
+        });
+
+        // Animated counter function
+        function animateCounter(elementId, targetValue) {
+            const element = document.getElementById(elementId);
+            const startValue = 0;
+            const duration = 2000; // ms
+            const startTime = performance.now();
+
+            function updateCounter(currentTime) {
+                const elapsedTime = currentTime - startTime;
+                const progress = Math.min(elapsedTime / duration, 1);
+
+                // Easing function for smoother animation
+                const easeOutQuad = t => t * (2 - t);
+
+                // Calculate current count value
+                const currentCount = Math.floor(startValue + easeOutQuad(progress) * (targetValue - startValue));
+
+                // Update element
+                element.textContent = currentCount.toLocaleString();
+
+                // Continue animation if not complete
+                if (progress < 1) {
+                    requestAnimationFrame(updateCounter);
+                }
+            }
+
+            requestAnimationFrame(updateCounter);
         }
 
-        // Запускаем обновление статистики каждые 10 секунд, а также делаем первичный вызов
-        setInterval(updateChatStats, 10000);
-        updateChatStats();
+        // Мобильное меню
+        document.addEventListener('DOMContentLoaded', function() {
+            const menuToggle = document.getElementById('mobile-menu-toggle');
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.menu-overlay');
+
+            // Проверяем, является ли устройство мобильным
+            const isMobile = window.innerWidth <= 768;
+
+            if (menuToggle && sidebar && overlay) {
+                // Обработчик для открытия/закрытия меню
+                menuToggle.addEventListener('click', function() {
+                    sidebar.classList.toggle('active');
+                    overlay.classList.toggle('active');
+                });
+
+                // Клик по оверлею закрывает меню
+                overlay.addEventListener('click', function() {
+                    sidebar.classList.remove('active');
+                    overlay.classList.remove('active');
+                });
+
+                // При выборе чата на мобильном - закрываем меню
+                if (isMobile) {
+                    document.querySelectorAll('.chat-item').forEach(item => {
+                        item.addEventListener('click', function() {
+                            setTimeout(() => {
+                                sidebar.classList.remove('active');
+                                overlay.classList.remove('active');
+                            }, 300);
+                        });
+                    });
+                }
+            }
+
+            // Корректируем высоту на мобильных устройствах
+            function adjustMobileHeight() {
+                if (isMobile) {
+                    const vh = window.innerHeight * 0.01;
+                    document.documentElement.style.setProperty('--vh', `${vh}px`);
+                }
+            }
+
+            // Вызываем при загрузке и изменении размера окна
+            adjustMobileHeight();
+            window.addEventListener('resize', adjustMobileHeight);
+        });
     </script>
 </body>
 </html>
